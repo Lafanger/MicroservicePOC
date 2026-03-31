@@ -1,0 +1,57 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  buildConfiguration: 'Release'
+
+steps:
+
+# Install .NET
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: '8.x'
+
+# Restore
+- task: DotNetCoreCLI@2
+  displayName: Restore
+  inputs:
+    command: 'restore'
+    projects: 'microservice-orders/*.csproj'
+
+# Build
+- task: DotNetCoreCLI@2
+  displayName: Build
+  inputs:
+    command: 'build'
+    projects: 'microservice-orders/*.csproj'
+    arguments: '--configuration $(buildConfiguration)'
+
+# Publish
+- task: DotNetCoreCLI@2
+  displayName: Publish
+  inputs:
+    command: 'publish'
+    publishWebProjects: false
+    projects: 'microservice-orders/*.csproj'
+    arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+    zipAfterPublish: true
+
+# Transform config
+- task: FileTransform@1
+  displayName: Transform appsettings.json
+  inputs:
+    folderPath: '$(Build.ArtifactStagingDirectory)'
+    fileType: 'json'
+    targetFiles: '**/appsettings.json'
+
+# Deploy
+- task: AzureWebApp@1
+  displayName: Deploy Orders API
+  inputs:
+    azureSubscription: 'YOUR-SERVICE-CONNECTION'
+    appName: 'orders-api-app'
+    package: '$(Build.ArtifactStagingDirectory)/**/*.zip'
