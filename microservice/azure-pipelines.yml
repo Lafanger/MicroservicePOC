@@ -1,0 +1,48 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  VITE_API_BASE_URL: 'https://your-apim.azure-api.net'
+
+steps:
+
+# 1. Install Node
+- task: NodeTool@0
+  inputs:
+    versionSpec: '18.x'
+
+# 2. Install packages
+- task: Npm@1
+  inputs:
+    command: 'install'
+    workingDir: 'microservice'
+
+# 3. Create env file (IMPORTANT STEP)
+- script: |
+    echo "VITE_API_BASE_URL=$(VITE_API_BASE_URL)" > microservice/.env.production
+  displayName: Create env file
+
+# 4. Build app
+- task: Npm@1
+  inputs:
+    command: 'custom'
+    workingDir: 'frontend'
+    customCommand: 'run build'
+
+# 5. Zip build output
+- task: ArchiveFiles@2
+  inputs:
+    rootFolderOrFile: 'microservice/dist'
+    archiveType: 'zip'
+    archiveFile: '$(Build.ArtifactStagingDirectory)/frontend.zip'
+    includeRootFolder: false
+
+# 6. Deploy to App Service
+- task: AzureWebApp@1
+  inputs:
+    azureSubscription: 'YOUR-SERVICE-CONNECTION'
+    appName: 'frontend-app'
+    package: '$(Build.ArtifactStagingDirectory)/frontend.zip'
